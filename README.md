@@ -15,6 +15,12 @@ The repository is the companion to the review paper (citation will be added on p
 
 `fields.json` and `prompt.txt` are the exact extraction instructions used for the review. The extraction app is designed so that a human reviewer checks every AI-extracted value against its quoted evidence.
 
+## Screenshot
+
+![The extraction assistant: extraction form with evidence quotes (right) next to the source PDF (left)](docs/paper-analyzer-screenshot.png)
+
+The extraction assistant (`paper-analyzer`), with the extraction form and its evidence quotes (right) next to the source PDF (left). The values shown are the model's suggestions before human verification. The PDF shown is C. Liu, K. Xu, W. Xu, F. Shao, X. He and Z. Tang, "Voltage Control for Active Distribution Networks Considering Coordination of EV Charging Stations," *Electronics*, 2025, [doi:10.3390/electronics14183591](https://doi.org/10.3390/electronics14183591), reproduced under a [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) license.
+
 ## Running
 
 Both tools are static HTML/JavaScript; there is no build step and no backend.
