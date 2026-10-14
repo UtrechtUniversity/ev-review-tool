@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "EV Review Tool: screening and AI-assisted data extraction for a systematic review on EV smart charging"
+type: software
+authors:
+  - family-names: Knops
+    given-names: Pieter
+    affiliation: Utrecht University
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/UtrechtUniversity/ev-review-tool"
+license: MIT
+version: 1.0.0
+keywords:
+  - systematic review
+  - electric vehicles
+  - smart charging
+  - large language models
+  - data extraction

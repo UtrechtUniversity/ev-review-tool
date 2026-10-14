@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scopus Systematic Screening Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        .transition-all { transition: all 0.2s ease-in-out; }
+        mark { transition: background-color 0.15s; }
+    </style>
+</head>
+<body class="bg-slate-950 font-sans text-slate-100 min-h-screen flex flex-col selection:bg-indigo-600 selection:text-white">
+
+    <div id="upload-screen" class="flex-1 flex flex-col items-center justify-center p-6 max-w-4xl mx-auto w-full">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 mb-3">
+                Scopus Literature Screening Console
+            </h1>
+            <p class="text-slate-400 text-lg max-w-xl mx-auto">
+                Resume your systematic literature review seamlessly. Upload your active workspace file containing your completed `Exclusion Reason` and `Note` records.
+            </p>
+        </div>
+
+        <div id="drop-zone" class="w-full bg-slate-900 border-2 border-dashed border-slate-700 hover:border-indigo-500 transition-colors rounded-2xl p-12 text-center cursor-pointer flex flex-col items-center justify-center group shadow-2xl">
+            <input type="file" id="file-input" class="hidden" accept=".csv">
+            <div class="p-4 bg-slate-800 rounded-full mb-4 group-hover:scale-110 transition-transform shadow-inner">
+                <svg class="w-10 h-10 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+            </div>
+            <p class="text-lg font-medium text-slate-200 mb-1">Upload your Scopus Export CSV</p>
+            <p class="text-sm text-slate-400 mb-4">Drag your workspace file here or click to browse</p>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono bg-slate-950 text-slate-400 border border-slate-800">
+                Preserves columns: Exclusion Reason & Note (Quote-Free Notes Mode Active)
+            </span>
+        </div>
+    </div>
+
+
+    <div id="workspace-screen" class="hidden flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <header class="bg-slate-900 border-b border-slate-800 px-6 py-3.5 shadow-md shrink-0 z-10">
+            <div class="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between">
+                
+                <div class="flex items-center gap-4 shrink-0">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-slate-100">📊 Screening Console</h2>
+                            <span id="filename-badge" class="text-xs font-mono bg-slate-950 text-slate-400 px-2 py-0.5 rounded border border-slate-800 max-w-[160px] truncate"></span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                            <span>Paper</span>
+                            <input type="number" id="jump-input" class="w-14 bg-slate-950 border border-slate-800 rounded px-1 py-0.5 text-center font-bold text-indigo-400 focus:outline-none focus:border-indigo-500 text-xs" min="1">
+                            <span>of <span id="total-count" class="font-semibold text-slate-200">0</span></span>
+                            <div class="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden ml-1 hidden sm:block">
+                                <div id="progress-bar-fill" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3 bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 text-xs font-medium shrink-0 shadow-inner">
+                    <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold mr-1">Metrics:</span>
+                    <div class="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded border border-slate-800/60">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span class="text-slate-400">Included:</span>
+                        <span id="stat-included" class="text-emerald-400 font-bold font-mono">0</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded border border-slate-800/60">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        <span class="text-slate-400">Excluded:</span>
+                        <span id="stat-excluded" class="text-red-400 font-bold font-mono">0</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded border border-slate-800/60">
+                        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                        <span class="text-slate-400">Skipped:</span>
+                        <span id="stat-skipped" class="text-slate-300 font-bold font-mono">0</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded border border-slate-800/60">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span class="text-slate-400">Yet to Scan:</span>
+                        <span id="stat-yet" class="text-amber-400 font-bold font-mono">0</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 bg-slate-900 px-2.5 py-1 rounded border border-indigo-500/40 ml-2">
+                        <input type="checkbox" id="unreviewed-only-toggle" class="w-3.5 h-3.5 rounded text-indigo-600 bg-slate-950 border-slate-800 focus:ring-indigo-500 cursor-pointer" onchange="toggleUnreviewedMode()" checked>
+                        <label for="unreviewed-only-toggle" class="font-bold uppercase tracking-wider text-[10px] cursor-pointer text-indigo-400">Scan Unreviewed Only</label>
+                    </div>
+                </div>
+
+                <div class="shrink-0 w-full xl:w-auto flex items-center justify-end gap-2">
+                    <div id="match-metrics" class="hidden sm:flex items-center gap-1.5 text-xs bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                        </div>
+                    <button onclick="exportCSV()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2 rounded-xl shadow-md transition-all text-xs uppercase tracking-wider">
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <section class="bg-slate-900 px-6 py-2 border-b border-slate-800 shrink-0 shadow-inner">
+            <div id="filter-matrix-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 py-1">
+                </div>
+        </section>
+
+        <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+            
+            <aside class="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-slate-800 p-5 overflow-y-auto flex flex-col gap-3.5 bg-slate-900/10">
+                <div class="flex items-center justify-between bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60">
+                    <span class="text-xs font-semibold text-slate-400 tracking-wider uppercase text-[10px]">Current Evaluation Status</span>
+                    <span id="status-badge" class="text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full border">UNREVIEWED</span>
+                </div>
+
+                <div>
+                    <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-0.5">Title</span>
+                    <h2 id="paper-title" class="text-base font-bold text-white leading-snug"></h2>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 border-t border-slate-800/40 pt-2.5">
+                    <div class="col-span-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Source Title</span>
+                        <p id="paper-journal" class="text-xs font-medium text-slate-200 truncate"></p>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Year</span>
+                        <p id="paper-year" class="text-xs font-medium text-slate-200"></p>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-800/40 pt-2.5">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Authors</span>
+                    <p id="paper-authors" class="text-xs text-slate-300 line-clamp-2 leading-relaxed"></p>
+                </div>
+
+                <div class="border-t border-slate-800/40 pt-2.5 space-y-2 flex-1 overflow-y-auto min-h-[120px]">
+                    <div>
+                        <span class="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-0.5">Author Keywords</span>
+                        <div id="paper-auth-keywords" class="text-xs text-slate-300 leading-relaxed"></div>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-teal-400 uppercase tracking-widest block mb-0.5">Index Keywords</span>
+                        <div id="paper-idx-keywords" class="text-xs text-slate-300 leading-relaxed"></div>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-800 pt-2 hidden lg:block text-[10px] text-slate-500">
+                    <div class="grid grid-cols-2 gap-1 font-mono">
+                        <div><kbd class="bg-slate-900 border border-slate-800 px-1 rounded text-slate-400">I</kbd> / <kbd class="bg-slate-900 border border-slate-800 px-1 rounded text-slate-400">→</kbd> Include ('IN')</div>
+                        <div><kbd class="bg-slate-900 border border-slate-800 px-1 rounded text-slate-400">E</kbd> / <kbd class="bg-slate-900 border border-slate-800 px-1 rounded text-slate-400">←</kbd> Exclude</div>
+                        <div><kbd class="bg-slate-900 border border-slate-800 px-1 rounded text-slate-400">S</kbd> / <kbd class="bg-slate-900 border border-slate-450 px-1 rounded text-slate-400">↓</kbd> Skip ('Skip')</div>
+                        <div><kbd class="bg-slate-900 border border-slate-800 px-1 rounded text-slate-400">P</kbd> / <kbd class="bg-slate-900 border border-slate-450 px-1 rounded text-slate-400">↑</kbd> Previous Item</div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="lg:col-span-7 p-5 overflow-hidden flex flex-col bg-slate-950">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-2xl flex-1 flex flex-col overflow-hidden">
+                    <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-1.5 shrink-0">Abstract Body</span>
+                    <div id="paper-abstract" class="text-slate-200 text-sm leading-relaxed overflow-y-auto flex-1 pr-1 whitespace-pre-wrap selection:bg-indigo-600 selection:text-white">
+                        </div>
+                </div>
+            </main>
+        </div>
+
+        <footer class="bg-slate-900 border-t border-slate-800 p-4 flex flex-col gap-3 shrink-0 z-10 shadow-2xl">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                
+                <div class="lg:col-span-5 flex flex-col gap-1.5">
+                    <label class="text-[10px] font-bold text-red-400 uppercase tracking-widest">Exclusion Reason</label>
+                    <input type="text" id="exclusion-reason-input" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-medium text-slate-200 placeholder-slate-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all" placeholder="Type reason or select from filter options below...">
+                    
+                    <div class="flex flex-wrap gap-1 items-center">
+                        <span class="text-[9px] font-bold text-slate-500 uppercase mr-1">Filter Suggestions:</span>
+                        <button onclick="applyQuickExclusion('Mobility Filter')" class="bg-slate-950 hover:bg-red-950/40 border border-slate-800 hover:border-red-900/60 px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 hover:text-red-300 transition-colors">Mobility Filter</button>
+                        <button onclick="applyQuickExclusion('Charging Filter')" class="bg-slate-950 hover:bg-red-950/40 border border-slate-800 hover:border-red-900/60 px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 hover:text-red-300 transition-colors">Charging Filter</button>
+                        <button onclick="applyQuickExclusion('Method Filter')" class="bg-slate-950 hover:bg-red-950/40 border border-slate-800 hover:border-red-900/60 px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 hover:text-red-300 transition-colors">Method Filter</button>
+                        <button onclick="applyQuickExclusion('Grid Filter')" class="bg-slate-950 hover:bg-red-950/40 border border-slate-800 hover:border-red-900/60 px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 hover:text-red-300 transition-colors">Grid Filter</button>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7 flex flex-col gap-1.5">
+                    <label class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Screening Notes (Column: Note)</label>
+                    <input type="text" id="screening-notes-input" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" placeholder="Enter session annotations or analysis observations here...">
+                    <div class="text-[9px] text-slate-500 font-medium italic">Type notes and click Include, Exclude, or Skip to save and navigate.</div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between border-t border-slate-800/60 pt-3">
+                <button onclick="navigatePrevious()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold px-4 py-2 rounded-xl transition-colors text-xs uppercase tracking-wider">
+                    Previous Paper
+                </button>
+                
+                <div class="flex items-center gap-2">
+                    <button onclick="handleExplicitExclusionAction()" class="bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/80 font-bold px-5 py-2 rounded-xl transition-all text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <span>Exclude</span> <span class="opacity-40 font-mono text-[10px] hidden md:inline">[E]</span>
+                    </button>
+                    <button onclick="handleDirectClassificationAction('Skip')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 font-bold px-5 py-2 rounded-xl transition-all text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <span>Skip</span> <span class="opacity-40 font-mono text-[10px] hidden md:inline">[S]</span>
+                    </button>
+                    <button onclick="handleDirectClassificationAction('IN')" class="bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80 font-bold px-5 py-2 rounded-xl transition-all text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <span>Include</span> <span class="opacity-40 font-mono text-[10px] hidden md:inline">[I]</span>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+
+    <script>
+        // Memory Architecture Framework State Coordinates
+        let dataset = [];
+        let currentIndex = 0;
+        let columnMapping = {};
+
+        // Custom High-Complexity 4-Category Filters Query Architecture Pre-loaded
+        const filterGroups = [
+            {
+                label: "Mobility",
+                color: "#fef08a", // Soft Yellow
+                textColor: "#854d0e",
+                queryString: `EV OR "Electric Vehicle*" OR "Electric Car*"`
+            },
+            {
+                label: "Charging",
+                color: "#bfdbfe", // Soft Blue
+                textColor: "#1e40af",
+                queryString: `( ( ( charg* W/5 ( schedul* OR dispatch* OR manag* OR session* OR "planning" OR "coordinati*" ) ) OR "smart-charging" ) )`
+            },
+            {
+                label: "Method",
+                color: "#bbf7d0", // Soft Green
+                textColor: "#166534",
+                queryString: `"Mathematical Program*" OR "Linear Program*" OR "Linear Problem*" OR Metaheuristic* OR Meta-heuristic* OR Matheuristic* OR Heuristic* OR "Stochastic program*" OR "Robust Optimi?ation" OR "Chance-constrained program*" OR "Markov decision process*" OR "cone program*" OR "cone problem*" OR "MDP" OR "Genetic Algorithm*" OR "PSA" OR "particle swarm optimi?ation" OR "NSGA" OR "Local Search" OR "Large Neighborhood Search" OR "LNS" OR "Simulated Annealing" OR "Quadratic Program*"`
+            },
+            {
+                label: "Grid",
+                color: "#fbcfe8", // Soft Pink
+                textColor: "#9d174d",
+                queryString: `"demand limit*" OR "power limit*" OR "load limit*" OR "connection limit" OR "connection power" OR "constrained grid*" OR "limited grid" OR "transformer limit*" OR "limited transformer*" OR "grid limit*" OR "capacity limit*" OR "contract* limit*" OR "contract* power" OR "contract* demand" OR "line limit*" OR "aggregate power" OR "aggregate demand" OR "constrained power" OR "constrained demand" OR "grid constraint*" OR "maximum capacity" OR "maximum power" OR "optimal power flow" OR "OPF" OR "AC-OPF" OR "power flow limit*" OR "power flow constraint*" OR "DistFlow" OR "branch flow" OR "LinDistFlow" OR ( IEEE W/2 bus* ) OR ( IEEE W/2 node* )`
+            }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDragAndDrop();
+            setupKeyboardShortcuts();
+            setupManualJumpInput();
+            renderFilterConfigurationPanel();
+        });
+
+        // Initialize Filter Config textareas matching your explicit queries
+        function renderFilterConfigurationPanel() {
+            const container = document.getElementById('filter-matrix-container');
+            container.innerHTML = '';
+
+            filterGroups.forEach((group, idx) => {
+                const card = document.createElement('div');
+                card.className = "flex flex-col bg-slate-950 p-2 rounded-lg border border-slate-850";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style="background-color: ${group.color}; color: ${group.textColor}">
+                            ${group.label}
+                        </span>
+                        <span id="metric-count-${idx}" class="text-[9px] text-slate-500 font-mono font-bold">0 matches</span>
+                    </div>
+                    <textarea class="bg-slate-900 border border-slate-800 text-[10px] font-mono p-1 rounded h-11 text-slate-300 focus:outline-none focus:border-indigo-500 font-medium resize-none leading-tight"
+                              oninput="updateGroupFilterQuery(${idx}, this.value)">${group.queryString}</textarea>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateGroupFilterQuery(index, val) {
+            filterGroups[index].queryString = val;
+            renderCurrentPaper();
+        }
+
+        // Scopus Query Parser: handles OR, W/N proximity, quoted phrases, wildcards, and parenthesized groups
+        function compileScopusClauseToRegexList(queryString) {
+            if (!queryString || !queryString.trim()) return [];
+
+            function tokenize(query) {
+                const tokens = [];
+                let i = 0;
+                while (i < query.length) {
+                    if (/\s/.test(query[i])) { i++; continue; }
+                    if (query[i] === '"') {
+                        let j = i + 1;
+                        while (j < query.length && query[j] !== '"') j++;
+                        tokens.push({ type: 'QUOTED', value: query.slice(i + 1, j) });
+                        i = j + 1;
+                        continue;
+                    }
+                    if (query[i] === '(') { tokens.push({ type: 'LPAREN' }); i++; continue; }
+                    if (query[i] === ')') { tokens.push({ type: 'RPAREN' }); i++; continue; }
+                    if (/[a-zA-Z0-9*?\-]/.test(query[i])) {
+                        let j = i;
+                        while (j < query.length && /[a-zA-Z0-9*?\-]/.test(query[j])) j++;
+                        const word = query.slice(i, j);
+                        // Detect W/N proximity operator (e.g. W/5)
+                        if ((word === 'W' || word === 'w') && j < query.length && query[j] === '/') {
+                            let k = j + 1;
+                            while (k < query.length && /\d/.test(query[k])) k++;
+                            if (k > j + 1) {
+                                tokens.push({ type: 'WN', n: parseInt(query.slice(j + 1, k)) });
+                                i = k;
+                                continue;
+                            }
+                        }
+                        tokens.push(word.toUpperCase() === 'OR' ? { type: 'OR' } : { type: 'WORD', value: word });
+                        i = j;
+                        continue;
+                    }
+                    i++;
+                }
+                return tokens;
+            }
+
+            function termToPattern(term) {
+                let p = term.replace(/[\-\[\]\/\{\}\(\)\+\.\\\^\$\|]/g, "\\$&");
+                p = p.replace(/\s+/g, '\\s+');
+                p = p.replace(/\*/g, '\\w*').replace(/\?/g, '\\w');
+                if (/^[a-zA-Z0-9]/.test(term)) p = '\\b' + p;
+                if (/[a-zA-Z0-9*?]$/.test(term)) p = p + '\\b';
+                return p;
+            }
+
+            const tokens = tokenize(queryString.trim());
+            let pos = 0;
+
+            function parseOrExpr() {
+                let alts = parseWnExpr();
+                while (pos < tokens.length && tokens[pos].type === 'OR') {
+                    pos++;
+                    alts = alts.concat(parseWnExpr());
+                }
+                return alts;
+            }
+
+            function parseWnExpr() {
+                const left = parsePrimary();
+                if (pos < tokens.length && tokens[pos].type === 'WN') {
+                    const n = tokens[pos].n;
+                    pos++;
+                    const right = parsePrimary();
+                    // Gap: any non-word separator(s), up to n-1 intervening words
+                    const gap = `\\W+(?:\\w+\\W+){0,${Math.max(0, n - 1)}}`;
+                    const result = [];
+                    for (const l of left) {
+                        for (const r of right) {
+                            result.push(`(?:${l}${gap}${r}|${r}${gap}${l})`);
+                        }
+                    }
+                    return result;
+                }
+                return left;
+            }
+
+            function parsePrimary() {
+                if (pos >= tokens.length) return [];
+                if (tokens[pos].type === 'LPAREN') {
+                    pos++;
+                    const inner = parseOrExpr();
+                    if (pos < tokens.length && tokens[pos].type === 'RPAREN') pos++;
+                    return inner;
+                }
+                if (tokens[pos].type === 'QUOTED' || tokens[pos].type === 'WORD') {
+                    const p = termToPattern(tokens[pos].value);
+                    pos++;
+                    return [p];
+                }
+                pos++;
+                return [];
+            }
+
+            const patterns = parseOrExpr();
+            const regexList = [];
+            for (const pattern of patterns) {
+                try {
+                    regexList.push(new RegExp(pattern, 'gi'));
+                } catch (e) {}
+            }
+            return regexList;
+        }
+
+        // Non-destructive HTML Safe Highlight Mapping Engine
+        function compileHighlightedText(text, targetFieldID = null) {
+            if (!text) return `<span class="text-slate-600 italic">No field entry content found.</span>`;
+            
+            let matchIntervals = [];
+            let countsPerGroup = filterGroups.map(() => 0);
+
+            filterGroups.forEach((group, groupIdx) => {
+                const compiledRegexes = compileScopusClauseToRegexList(group.queryString);
+                
+                compiledRegexes.forEach(regex => {
+                    regex.lastIndex = 0;
+                    let match;
+                    while ((match = regex.exec(text)) !== null) {
+                        if (match[0].length === 0) {
+                            regex.lastIndex++;
+                            continue;
+                        }
+                        matchIntervals.push({
+                            start: match.index,
+                            end: regex.lastIndex,
+                            color: group.color,
+                            textColor: group.textColor,
+                            groupIdx: groupIdx
+                        });
+                    }
+                });
+            });
+
+            matchIntervals.sort((a, b) => {
+                if (a.start !== b.start) return a.start - b.start;
+                return (b.end - b.start) - (a.end - a.start);
+            });
+
+            let nonOverlappingIntervals = [];
+            let trackingCursor = 0;
+
+            for (let currentInterval of matchIntervals) {
+                if (currentInterval.start >= trackingCursor) {
+                    nonOverlappingIntervals.push(currentInterval);
+                    countsPerGroup[currentInterval.groupIdx]++;
+                    trackingCursor = currentInterval.end;
+                }
+            }
+
+            if (targetFieldID === 'paper-abstract') {
+                updateVisualMetricsPanel(countsPerGroup);
+            }
+
+            function sanitizeHtmlEntities(str) {
+                return str
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            let finalHtmlOutput = '';
+            let globalReadIdx = 0;
+
+            nonOverlappingIntervals.forEach(interval => {
+                finalHtmlOutput += sanitizeHtmlEntities(text.substring(globalReadIdx, interval.start));
+                finalHtmlOutput += `<mark class="px-0.5 rounded-xs font-semibold shadow-xs" style="background-color: ${interval.color}; color: ${interval.textColor}">${sanitizeHtmlEntities(text.substring(interval.start, interval.end))}</mark>`;
+                globalReadIdx = interval.end;
+            });
+
+            finalHtmlOutput += sanitizeHtmlEntities(text.substring(globalReadIdx));
+            return finalHtmlOutput;
+        }
+
+        function updateVisualMetricsPanel(counts) {
+            counts.forEach((count, idx) => {
+                const metricBadge = document.getElementById(`metric-count-${idx}`);
+                if (metricBadge) metricBadge.innerText = `${count} match${count === 1 ? '' : 'es'}`;
+            });
+
+            const container = document.getElementById('match-metrics');
+            container.innerHTML = `<span class="text-slate-500 font-semibold uppercase tracking-wider text-[9px] mr-0.5">Hits:</span>`;
+            container.classList.remove('hidden');
+
+            filterGroups.forEach((group, idx) => {
+                const pill = document.createElement('span');
+                pill.className = "px-1.5 py-0.5 rounded font-mono font-bold text-[9px]";
+                pill.style.backgroundColor = counts[idx] > 0 ? group.color : '#0f172a';
+                pill.style.color = counts[idx] > 0 ? group.textColor : '#475569';
+                pill.innerText = `${group.label.charAt(0)}:${counts[idx]}`;
+                container.appendChild(pill);
+            });
+        }
+
+        // Live Dashboard Summary Stats Counter Engine
+        function updateDashboardScreeningStats() {
+            if (dataset.length === 0) return;
+
+            let includedCount = 0;
+            let excludedCount = 0;
+            let skippedCount = 0;
+            let yetToScanCount = 0;
+
+            dataset.forEach(row => {
+                const val = (row[columnMapping.exclusionReason] || '').toString().trim();
+                if (!val) {
+                    yetToScanCount++;
+                } else if (val.toUpperCase() === 'IN') {
+                    includedCount++;
+                } else if (val.toUpperCase() === 'SKIP' || val.toUpperCase() === 'SKIPPED') {
+                    skippedCount++;
+                } else {
+                    excludedCount++;
+                }
+            });
+
+            document.getElementById('stat-included').innerText = includedCount;
+            document.getElementById('stat-excluded').innerText = excludedCount;
+            document.getElementById('stat-skipped').innerText = skippedCount;
+            document.getElementById('stat-yet').innerText = yetToScanCount;
+        }
+
+        // Target Navigation Mode Switch: Toggling forces active visibility checks
+        function toggleUnreviewedMode() {
+            const isChecked = document.getElementById('unreviewed-only-toggle').checked;
+            if (isChecked) {
+                const val = (dataset[currentIndex][columnMapping.exclusionReason] || '').toString().trim();
+                if (val) {
+                    findNextAvailableUnreviewedItem(currentIndex, true);
+                }
+            }
+        }
+
+        // Multi-Directional Unreviewed Leapfrog Navigation Engine
+        function findNextAvailableUnreviewedItem(startingIndex, searchForward = true) {
+            if (searchForward) {
+                for (let i = startingIndex; i < dataset.length; i++) {
+                    if (!(dataset[i][columnMapping.exclusionReason] || '').toString().trim()) {
+                        currentIndex = i;
+                        renderCurrentPaper();
+                        return true;
+                    }
+                }
+                for (let i = 0; i < startingIndex; i++) {
+                    if (!(dataset[i][columnMapping.exclusionReason] || '').toString().trim()) {
+                        currentIndex = i;
+                        renderCurrentPaper();
+                        return true;
+                    }
+                }
+            } else {
+                for (let i = startingIndex; i >= 0; i--) {
+                    if (!(dataset[i][columnMapping.exclusionReason] || '').toString().trim()) {
+                        currentIndex = i;
+                        renderCurrentPaper();
+                        return true;
+                    }
+                }
+                for (let i = dataset.length - 1; i > startingIndex; i--) {
+                    if (!(dataset[i][columnMapping.exclusionReason] || '').toString().trim()) {
+                        currentIndex = i;
+                        renderCurrentPaper();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Render current active layout paper item attributes
+        function renderCurrentPaper() {
+            if (dataset.length === 0) return;
+
+            const paper = dataset[currentIndex];
+
+            document.getElementById('total-count').innerText = dataset.length;
+            const jumpInput = document.getElementById('jump-input');
+            jumpInput.value = currentIndex + 1;
+            jumpInput.max = dataset.length;
+
+            const progressPercentage = ((currentIndex + 1) / dataset.length) * 100;
+            document.getElementById('progress-bar-fill').style.width = `${progressPercentage}%`;
+
+            const badge = document.getElementById('status-badge');
+            const rawExclusionValue = (paper[columnMapping.exclusionReason] || '').toString().trim();
+            
+            badge.innerText = rawExclusionValue ? rawExclusionValue.toUpperCase() : 'UNREVIEWED';
+            badge.className = "text-[10px] font-bold tracking-widest px-2.5 py-0.5 rounded-full border ";
+            
+            if (rawExclusionValue.toUpperCase() === 'IN') {
+                badge.classList.add('bg-emerald-950/80', 'text-emerald-400', 'border-emerald-700');
+            } else if (rawExclusionValue.toUpperCase() === 'SKIP' || rawExclusionValue.toUpperCase() === 'SKIPPED') {
+                badge.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-600');
+            } else if (rawExclusionValue) {
+                badge.classList.add('bg-red-950/80', 'text-red-400', 'border-red-700');
+            } else {
+                badge.classList.add('bg-slate-950', 'text-slate-500', 'border-slate-800');
+            }
+
+            document.getElementById('paper-title').innerHTML = compileHighlightedText(paper[columnMapping.title]);
+            document.getElementById('paper-journal').innerHTML = fallbackTextClean(paper[columnMapping.journal], 'N/A');
+            document.getElementById('paper-year').innerHTML = fallbackTextClean(paper[columnMapping.year], 'N/A');
+            document.getElementById('paper-authors').innerHTML = fallbackTextClean(paper[columnMapping.authors], 'Unknown Authors');
+            
+            document.getElementById('paper-auth-keywords').innerHTML = compileHighlightedText(paper[columnMapping.authorKeywords]);
+            document.getElementById('paper-idx-keywords').innerHTML = compileHighlightedText(paper[columnMapping.indexKeywords]);
+
+            const abstractRawText = paper[columnMapping.abstract] || '';
+            const abstractContainer = document.getElementById('paper-abstract');
+            
+            if (!abstractRawText.toString().trim()) {
+                abstractContainer.innerHTML = `<div class="text-amber-400/80 italic text-xs bg-amber-950/20 border border-amber-900/60 p-3 rounded-lg">[Notice: Empty Abstract structure in Scopus record row index].</div>`;
+                updateVisualMetricsPanel(filterGroups.map(() => 0));
+            } else {
+                abstractContainer.innerHTML = compileHighlightedText(abstractRawText, 'paper-abstract');
+            }
+
+            document.getElementById('exclusion-reason-input').value = rawExclusionValue;
+            document.getElementById('screening-notes-input').value = paper[columnMapping.note] || '';
+        }
+
+        function fallbackTextClean(val, alt) {
+            return val ? String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : `<span class="text-slate-600 italic">${alt}</span>`;
+        }
+
+        // Commit active input strings directly into data matrix arrays (With Quote-Prevention Sanitizer)
+        function commitCurrentInputs() {
+            if (dataset[currentIndex]) {
+                dataset[currentIndex][columnMapping.exclusionReason] = document.getElementById('exclusion-reason-input').value.trim();
+                
+                let inputNote = document.getElementById('screening-notes-input').value.trim();
+                
+                // CRITICAL FIX: Strip all literal double quotes and convert newline sequences into linear spaces. 
+                // This prevents standard CSV generation parsers from wrapping the notes field inside quotation marks.
+                inputNote = inputNote.replace(/"/g, '').replace(/[\r\n]+/g, ' ');
+                
+                dataset[currentIndex][columnMapping.note] = inputNote;
+            }
+        }
+
+        // Core Pipeline Advancement Controller
+        function advanceOrFinish() {
+            commitCurrentInputs();
+            updateDashboardScreeningStats();
+
+            const unreviewedOnlyMode = document.getElementById('unreviewed-only-toggle').checked;
+            if (unreviewedOnlyMode) {
+                const matchesLeft = findNextAvailableUnreviewedItem(currentIndex + 1, true);
+                if (!matchesLeft) {
+                    alert("🎉 All remaining unreviewed papers have been processed! Turning off filter toggle to show complete summary.");
+                    document.getElementById('unreviewed-only-toggle').checked = false;
+                    renderCurrentPaper();
+                }
+            } else {
+                if (currentIndex < dataset.length - 1) {
+                    currentIndex++;
+                    renderCurrentPaper();
+                } else {
+                    renderCurrentPaper();
+                    alert("🎉 End of dataset records reached! Review complete.");
+                }
+            }
+        }
+
+        // Classification Event Actions Execution Handlers
+        function handleDirectClassificationAction(statusValue) {
+            if (dataset.length === 0) return;
+            document.getElementById('exclusion-reason-input').value = statusValue;
+            advanceOrFinish();
+        }
+
+        function handleExplicitExclusionAction() {
+            if (dataset.length === 0) return;
+            let reason = document.getElementById('exclusion-reason-input').value.trim();
+            if (!reason || reason.toUpperCase() === 'IN' || reason.toUpperCase() === 'SKIP') {
+                reason = 'Excluded';
+            }
+            document.getElementById('exclusion-reason-input').value = reason;
+            advanceOrFinish();
+        }
+
+        // Quick-Exclusion Suggestion Badge Action Handler (As Revised: Populates, holds position, focuses note field)
+        function applyQuickExclusion(filterReasonString) {
+            if (dataset.length === 0) return;
+            // Populates text value box without jumping forward automatically
+            document.getElementById('exclusion-reason-input').value = filterReasonString;
+            // Shakes user focus straight into note box so you can comfortably type observations immediately
+            document.getElementById('screening-notes-input').focus();
+        }
+
+        function navigatePrevious() {
+            if (dataset.length === 0) return;
+            commitCurrentInputs();
+            updateDashboardScreeningStats();
+
+            const unreviewedOnlyMode = document.getElementById('unreviewed-only-toggle').checked;
+            if (unreviewedOnlyMode) {
+                findNextAvailableUnreviewedItem(currentIndex - 1, false);
+            } else {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    renderCurrentPaper();
+                }
+            }
+        }
+
+        // Automatic column layout mapping configuration heuristic matching your file structure exactly
+        function detectColumns(headers) {
+            const mapping = { 
+                title: '', abstract: '', authors: '', journal: '', year: '', 
+                authorKeywords: '', indexKeywords: '', exclusionReason: 'Exclusion Reason', note: 'Note' 
+            };
+            
+            headers.forEach(h => {
+                const clean = h.toLowerCase().trim();
+                if (clean === 'title') mapping.title = h;
+                else if (clean === 'abstract') mapping.abstract = h;
+                else if (clean === 'authors' || clean === 'author(s)') mapping.authors = h;
+                else if (clean === 'source title' || clean === 'journal' || clean === 'journal title') mapping.journal = h;
+                else if (clean === 'year') mapping.year = h;
+                else if (clean === 'author keywords') mapping.authorKeywords = h;
+                else if (clean === 'index keywords') mapping.indexKeywords = h;
+                else if (clean === 'exclusion reason') mapping.exclusionReason = h;
+                else if (clean === 'note' || clean === 'notes') mapping.note = h;
+            });
+
+            if (!mapping.title) mapping.title = headers.find(h => h.toLowerCase().includes('title')) || headers[0];
+            if (!mapping.abstract) mapping.abstract = headers.find(h => h.toLowerCase().includes('abstract')) || headers[1];
+            if (!mapping.authors) mapping.authors = headers.find(h => h.toLowerCase().includes('author')) || '';
+            if (!mapping.journal) mapping.journal = headers.find(h => h.toLowerCase().includes('source') || h.toLowerCase().includes('journal')) || '';
+            if (!mapping.year) mapping.year = headers.find(h => h.toLowerCase().includes('year')) || '';
+            if (!mapping.authorKeywords) mapping.authorKeywords = headers.find(h => h.toLowerCase().includes('author keyword')) || '';
+            if (!mapping.indexKeywords) mapping.indexKeywords = headers.find(h => h.toLowerCase().includes('index keyword')) || '';
+            
+            return mapping;
+        }
+
+        function initializeWorkspaceSession(parsedRecords, headerFields) {
+            columnMapping = detectColumns(headerFields);
+            dataset = parsedRecords;
+
+            dataset.forEach(row => {
+                if (row[columnMapping.exclusionReason] === undefined) row[columnMapping.exclusionReason] = '';
+                if (row[columnMapping.note] === undefined) row[columnMapping.note] = '';
+                else {
+                    // Clean loaded values to guarantee a quote-free runtime start
+                    row[columnMapping.note] = String(row[columnMapping.note]).replace(/"/g, '').trim();
+                }
+            });
+
+            // If "Scan Unreviewed Only" is checked by default, locate the first blank exclusion cell
+            currentIndex = 0;
+            for (let i = 0; i < dataset.length; i++) {
+                if (!(dataset[i][columnMapping.exclusionReason] || '').toString().trim()) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            document.getElementById('upload-screen').classList.add('hidden');
+            document.getElementById('workspace-screen').classList.remove('hidden');
+            
+            updateDashboardScreeningStats();
+            renderCurrentPaper();
+        }
+
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+
+            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-indigo-500', 'bg-slate-900/60'); });
+            dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-indigo-500', 'bg-slate-900/60'); });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-indigo-500', 'bg-slate-900/60');
+                if (e.dataTransfer.files.length > 0) handleFileImport(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) handleFileImport(e.target.files[0]);
+            });
+        }
+
+        function handleFileImport(file) {
+            document.getElementById('filename-badge').innerText = file.name;
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(res) {
+                    if (res.data && res.data.length > 0) initializeWorkspaceSession(res.data, res.meta.fields);
+                    else alert("CSV Parse Error: Loaded file appears empty.");
+                },
+                error: function(err) { alert("File Read Error: " + err.message); }
+            });
+        }
+
+        function setupManualJumpInput() {
+            const el = document.getElementById('jump-input');
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    let targetIdx = parseInt(el.value, 10) - 1;
+                    if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < dataset.length) {
+                        commitCurrentInputs();
+                        currentIndex = targetIdx;
+                        updateDashboardScreeningStats();
+                        renderCurrentPaper();
+                        el.blur();
+                    } else {
+                        renderCurrentPaper();
+                    }
+                }
+            });
+        }
+
+        // Active Keyboard Navigation Map Configuration
+        function setupKeyboardShortcuts() {
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                const key = e.key.toLowerCase();
+                if (key === 'i' || e.key === 'ArrowRight') { e.preventDefault(); handleDirectClassificationAction('IN'); }
+                else if (key === 'e' || e.key === 'ArrowLeft') { e.preventDefault(); handleExplicitExclusionAction(); }
+                else if (key === 's' || e.key === 'ArrowDown') { e.preventDefault(); handleDirectClassificationAction('Skip'); }
+                else if (key === 'p' || e.key === 'ArrowUp') { e.preventDefault(); navigatePrevious(); }
+            });
+        }
+
+        function exportCSV() {
+            if (dataset.length === 0) return;
+            commitCurrentInputs();
+
+            // Export parameters with structural safety metrics configuration mapping
+            const parsedOutput = Papa.unparse(dataset);
+            const blobObj = new Blob([parsedOutput], { type: 'text/csv;charset=utf-8;' });
+            const anchor = document.createElement("a");
+            const url = URL.createObjectURL(blobObj);
+            
+            anchor.setAttribute("href", url);
+            anchor.setAttribute("download", `scopus_screened_dataset_${new Date().toISOString().slice(0,10)}.csv`);
+            anchor.style.visibility = 'hidden';
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+        }
+    </script>
+</body>
+</html>

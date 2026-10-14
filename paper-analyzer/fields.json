@@ -1,0 +1,112 @@
+[
+  {
+    "key": "ev_charging_decision_variable",
+    "label": "EV Charging as Decision Variable",
+    "type": "enum",
+    "options": ["yes", "aggregated", "no", "unknown"],
+    "default": "unknown",
+    "evidence": true,
+    "hint": "yes = per-EV per-timestep control; aggregated = fleet-level pool; no = unmanaged/fixed",
+    "promptText": "EV_CHARGING_DECISION_VARIABLE — Evaluates the presence of direct control variables in the problem formulation. Choose from exactly three values:\n  \"yes\" → The EV charging power (or charging rate/current) can be controlled per individual vehicle and per timestep. This per vehicle per timestep is explicitly a direct or indirect decision variable optimized by the solver. For example, P_{c,t}, for the car c at timestep t.\n  \"no\"  → Charging power per timestep is not a decision variable (e.g., charging is unmanaged, or fixed at a constant rate, or determined purely by external heuristics/tariffs without optimization choice).\n  \"aggregated\" → Charging power is aggregated over multiple EVs into one control variable.\n  \"unknown\" → Cannot be determined from the text.\n  * ev_charging_decision_variable_evidence: JSON array of 1–3 exact verbatim text quotes (each ≤ 200 chars) showing the charging power decision variable or state definition in the proposed model."
+  },
+  {
+    "key": "online_status",
+    "label": "Online / Replanning Control",
+    "type": "enum",
+    "options": ["offline", "stochastic", "online", "unknown"],
+    "default": "offline",
+    "evidence": true,
+    "hint": "offline = all inputs known at t=0; stochastic = uncertainty modeled once; online = re-solved on real events",
+    "promptText": "ONLINE_STATUS — The temporal execution model of the optimization/control algorithm. Choose from exactly four values:\n  \"offline\": All EV arrival times, departure times, energy requirements, electricity prices, and grid parameters are KNOWN at the start of the simulation. One optimization is solved once and the resulting schedule is executed without change. No uncertainty in the inputs.\n    → Qualifies: day-ahead MILP/LP/QP with given EV profiles, any solve where all inputs are fixed deterministic values.\n    → CRITICAL — the following are ALL \"offline\", regardless of how complex or iterative the solver is:\n        • Multi-stage / iterative frameworks (e.g. \"Iterative Multistage Approach\", stage 1 → stage 2 → stage 3): these are solver loops for a single problem, NOT control loops.\n        • Decomposition methods: ADMM, Benders, Lagrangian relaxation, alternating optimization, bi-level programming — these converge to a solution before operation begins.\n        • Custom named frameworks (IMA, SETS, EIDP, etc.) that describe how the paper structures its algorithm — the name does not matter, ask what the MATHEMATICAL operations are.\n        • A paper that uses \"rolling horizon\" on a KNOWN simulation where all EV arrivals are pre-specified — if no real-world event can change the schedule, it is offline.\n    → DECISION RULE: \"Do all inputs exist at time 0 before any EV has physically arrived?\" If yes → offline.\n  \"stochastic\": EV arrivals, prices, or demand are modeled as UNCERTAIN using probability distributions, scenario trees, chance constraints, or robust sets — but the optimization is solved ONCE (offline). The output is a fixed policy or robust schedule accounting for uncertainty proactively, not reactively.\n    → Qualifies: two-stage stochastic programming, robust optimization, chance-constrained optimization, scenario-based planning — all solved in a single pass.\n    → DOES NOT qualify: assuming uncertainty but solving with deterministic values → offline. Re-solving at each step with new data → online.\n  \"online\": The optimization is RE-SOLVED during real operation using NEW INFORMATION that was genuinely not available (or not assumed known) at the start. Real-world events — an EV arriving unexpectedly, a price signal changing, a grid constraint binding — TRIGGER a new solve that changes the active schedule.\n    → Qualifies: MPC re-solved at every time step with updated state; rolling-horizon control where EV arrivals are UNKNOWN in advance and the schedule adapts when they actually arrive; event-triggered re-optimization.\n    → EXPLICIT FILTER — must have BOTH: (a) genuinely unknown inputs (random/unknown EV arrivals, uncertain demand, real-time prices) AND (b) the schedule is updated when those inputs are revealed.\n    → Keyword signals: \"unknown arrival times\", \"stochastic/uncertain demand realized online\", \"MPC\", \"rolling horizon with uncertain arrivals\", \"real-time re-scheduling\", \"event-triggered\".\n  \"unknown\": Cannot determine from the paper.\n  * online_evidence: JSON array of 1–3 exact verbatim text quotes (each ≤ 200 chars) confirming the execution mode."
+  },
+  {
+    "key": "grid_checkpoints",
+    "type": "boolean_group",
+    "label": "Grid Checkpoints",
+    "hint": "AI reasoning steps used to determine the grid level",
+    "fields": [
+      { "key": "check_l1_aggregate_limit",      "label": "L1 — Aggregate station/transformer cap inside optimization" },
+      { "key": "check_l4_node_voltages",        "label": "L4 — Node voltage bounds enforced inside optimization" },
+      { "key": "check_l5_exact_iterative_flow", "label": "L5 — Exact iterative power flow solver (Newton-Raphson, etc.) in loop" }
+    ],
+    "promptText": "GRID_SCOPE — Before assigning any grid level, determine whether the grid appears as an ACTIVE CONSTRAINT or a PASSIVE SIMULATION.\n  PASSIVE SIMULATION (grid_limit = \"0 - no limits\", set grid_scope_passive = true):\n    The paper optimizes EV charging based only on prices, user preferences, or battery health, and THEN runs a power flow analysis (e.g., on an IEEE feeder) or calculates peak load/voltages purely to observe, evaluate, or assess the impact after the fact. \n    CRITICAL REALITY FILTER: If a constraint (such as maximum power flow or maximum voltage deviation) is NOT modeled inside the mathematical optimization problem statement, but is only checked, simulated, or visualized afterwards, it is PASSIVE. It does NOT qualify for grid levels 1–6.\n    → Clues: \"the impact on the distribution network is evaluated\", \"ex-post analysis\", \"impact assessment\", \"the resulting load profile is applied to the IEEE system\", \"to analyze the effect on\".\n    → If the grid equations do NOT actively restrict the optimization decisions or adjust the solver's paths, set grid_limit to \"0 - no limits\" and note this is passive.\n  ACTIVE CONSTRAINT (proceed to levels 1–6):\n    Grid metrics (peak caps, line flows, or voltages) are mathematical boundaries INSIDE the optimization problem statement constraints. The optimizer is actively forced to alter charging schedules to prevent violations of these bounds.\n    → Clues: \"subject to network constraints\", \"bounded by line capacities\", \"enforcing grid limits during optimization\", constraint appears explicitly in objective penalty functions or feasibility sets.\n\n=== EXTRACTION CHECKPOINT: MECHANICAL GRID PROPERTIES ===\nYou MUST evaluate and populate these boolean properties before determining the final grid_limit string. This checklist forces step-by-step verification:\n\nCHECK_L1_AGGREGATE_LIMIT: (true/false) → True if the proposed optimization explicitly restrains total charging via an aggregate station cap, a baseline maximum fleet ceiling, or a local transformer loading wall.\nCHECK_L4_NODE_VOLTAGES: (true/false) → True if the proposed optimization formulation explicitly enforces local electrical node voltage bounds (e.g., V_min <= V_i <= V_max) inside its active constraint limits.\nCHECK_L5_EXACT_ITERATIVE_FLOW: (true/false) → True if the algorithm actively executes an exact, non-linear algebraic power flow calculation loop or numerical solver framework (such as Newton-Raphson or Gauss-Seidel) internally to evaluate network currents, losses, or voltages during the optimization iterations (e.g., within a PSO/GA candidate particle feasibility test check)."
+  },
+  {
+    "key": "grid_limit",
+    "label": "Grid Constraint Model",
+    "type": "enum",
+    "options": [
+      "0 - no limits",
+      "1 - single limit",
+      "4 - linearized AC power flow or convex relaxation",
+      "5 - AC-OPF balanced single-phase (exact non-linear)"
+    ],
+    "default": "0 - no limits",
+    "evidence": true,
+    "evidenceKey": "grid_limit_boundary_evidence",
+    "evidenceLabel": "Boundary constraint evidence (mathematical inequality)",
+    "hint": "Determined by checkpoints above — grid-side constraints only",
+    "promptText": "GRID_LIMIT — Determine the final constraint level using this strict deterministic override mapping based on your checkpoints above:\n  - IF (CHECK_L5_EXACT_ITERATIVE_FLOW == true AND CHECK_L4_NODE_VOLTAGES == true) → MUST output: \"5 - AC-OPF balanced single-phase (exact non-linear)\" (Even if an aggregate transformer limit also exists, the non-linear network solver physics hierarchically overrules it).\n  - IF (CHECK_L5_EXACT_ITERATIVE_FLOW == false AND CHECK_L4_NODE_VOLTAGES == true) → MUST output: \"4 - linearized AC power flow or convex relaxation\".\n  - IF (CHECK_L4_NODE_VOLTAGES == false AND CHECK_L1_AGGREGATE_LIMIT == true) → MUST output: \"1 - single limit\".\n  - IF all checkpoints are false → \"0 - no limits\".\n\n  * grid_limit_boundary_evidence: JSON array of 1–3 exact verbatim text quotes (each ≤ 200 chars) showing mathematical inequalities defining the active grid limit or voltage boundary in the proposed model (e.g., \"V_min <= V_i,h <= V_max\")."
+  },
+  {
+    "key": "grid_limit_solver_evidence",
+    "label": "Power flow solver evidence",
+    "type": "evidence_only",
+    "hint": "Solver/engine used inside the optimization loop (e.g. LinDistFlow, Newton-Raphson, SOCP relaxation)",
+    "promptText": "  * grid_limit_solver_evidence: JSON array of 1–3 exact verbatim text quotes (each ≤ 200 chars) identifying the power flow calculation engine or solver used inside the optimization loop (e.g., \"Newton Raphson load flow (NRLF)\", \"LinDistFlow\", \"SOCP relaxation\")."
+  },
+  {
+    "key": "linearized_ac_type",
+    "label": "AC Model Type",
+    "type": "enum",
+    "options": [
+      "slp - successive linearization",
+      "fixed - linear approximation",
+      "convex_relaxation - SOCP/SDP",
+      "n/a",
+      "unknown"
+    ],
+    "default": "n/a",
+    "subField": true,
+    "hint": "SLP iterative, fixed LinDistFlow, or convex relaxation (SOCP/SDP) — n/a if not level 4",
+    "promptText": "LINEARIZED_AC_TYPE — Applies ONLY when grid_limit is \"4 - linearized AC power flow or convex relaxation\":\n  \"slp - successive linearization\" → The linearization is iteratively refined (Successive Linear Programming, SCA).\n  \"fixed - linear approximation\"   → A single fixed linearization is used (e.g., standard LinDistFlow, first-order Taylor expansion).\n  \"convex_relaxation - SOCP/SDP\"  → The non-linear formulations are relaxed into convex conic forms using SOCP or SDP constraints.\n  \"n/a\"                            → grid_limit is not Level 4.\n  \"unknown\"                        → grid_limit is Level 4 but the formulation type is not clear from the paper."
+  },
+  {
+    "key": "v2g",
+    "label": "Vehicle-to-Grid (V2G)",
+    "type": "enum",
+    "options": ["yes", "no", "unknown"],
+    "default": "unknown",
+    "evidence": true,
+    "hint": "Bidirectional EV discharge back to the grid explicitly modeled",
+    "promptText": "V2G — Is Vehicle-to-Grid bidirectional discharge explicitly in the optimization formulation?\n  \"yes\" → Negative charging power (discharge to grid) is an active decision variable in the mathematical model.\n  \"no\"  → Unidirectional charging only.\n  \"unknown\" → Cannot determine.\n  * v2g_evidence: JSON array of 1–3 exact verbatim text quotes (each ≤ 200 chars) proving bidirectional discharge capability within the proposed model."
+  },
+  {
+    "key": "max_evs",
+    "label": "Max EVs in Case Study",
+    "type": "string",
+    "default": "",
+    "evidence": true,
+    "evidenceKey": "ev_count_evidence",
+    "evidenceLabel": "Evidence (where EV count is stated)",
+    "hint": "Largest EV fleet in any case study — exact number, \"~200\", or \"not simulated\"",
+    "promptText": "MAX_EVS — The maximum number of EVs used in any numerical simulation or case study in this paper. Give an exact number (e.g. \"50\"), an approximation (e.g. \"~200\"), or \"not simulated\" if no EV case study was conducted.\n  * ev_count_evidence: JSON array of 1–3 exact verbatim text quotes (each ≤ 200 chars) stating the EV count in the case study (often found in the simulation setup, case study, or numerical results sections)."
+  },
+  {
+    "key": "methodologies",
+    "label": "Methodologies",
+    "type": "methodologies",
+    "promptText": "METHODOLOGIES — List every distinct optimization/control algorithm numerically evaluated with EVs.\n  RULE 0 — MATHEMATICAL NAME ONLY: methodology_name must be the MATHEMATICAL/COMPUTATIONAL method (MILP, LP, QP, NLP, SOCP, GA, PSO, DP, MPC, ADMM, Benders, RL, Heuristic, etc.). Do NOT use the paper's custom framework name (e.g. do NOT write \"Iterative Multistage Approach\", \"IMA\", \"SETS\", \"EIDP\" or any other branded name). If the framework contains identifiable mathematical methods (e.g. MILP in stage 1 and a graph algorithm in stage 2), write \"MILP + Graph routing\". If a paper calls their approach \"IMA\" and it uses MILP internally, the answer is \"MILP\", not \"IMA\".\n  RULE 1 — COMBINED: If multiple algorithms or stages together form one integrated solution (sequential stages, outer loop + inner sub-problem, decomposition), list as ONE entry enumerating ALL component methods separated by \" + \". You MUST list every stage — do not omit middle stages. Examples: \"MILP + BLP\", \"MPC + MILP\", \"MILP + Graph routing + BLP\". A 3-stage framework where stage 1 = MILP, stage 2 = heuristic graph solver, stage 3 = BLP → write \"MILP + Heuristic + BLP\", not \"MILP + BLP\". Only separate entries if the paper independently evaluates methods as alternatives or baselines.\n  RULE 2 — COMPARED: If independently tested alternatives/baselines exist, list each as a SEPARATE entry.\n  RULE 3 — SIMULATION ONLY: Only include algorithms actually numerically tested with EVs in a case study.\n  RULE 4 — method_evidence: Exact verbatim quote (≤ 200 chars) naming or describing the MATHEMATICAL algorithm."
+  },
+  {
+    "key": "modality_types",
+    "label": "Modality Types",
+    "type": "string",
+    "default": "",
+    "evidence": true,
+    "evidenceKey": "modality_types_evidence",
+    "evidenceLabel": "Evidence (fleet/vehicle type studied)",
+    "hint": "Standardized: EV=car, BEB=bus, ET=truck, EP=plane, ES=ship. Add freeform words for anything else (taxi, e-scooter, train...)",
+    "promptText": "MODALITY_TYPES — Identify every transportation mode that is ACTUALLY the subject of this paper's proposed model / case study (not modes only mentioned in related work, motivation, or future-work speculation).\n  STANDARDIZED CODES — use these exact codes whenever the corresponding vehicle body type is present:\n    EV  = electric car / passenger vehicle\n    BEB = battery electric bus\n    ET  = electric truck\n    EP  = electric plane / aircraft\n    ES  = electric ship / vessel\n  FREEFORM — for any other transportation mode or fleet use-case that is NOT one of the five above (e.g. taxi, ride-hailing fleet, e-scooter, e-bike, delivery robot, train, ferry, forklift, drone), use a short plain lowercase word or phrase instead of inventing a new abbreviation.\n  OUTPUT FORMAT: a single string listing every distinct mode found, separated by \", \" (comma + space). Examples: \"EV\", \"BEB\", \"EV, BEB\", \"EV, taxi\", \"ET, ferry\". If only ordinary electric passenger cars are studied with no other qualifier, return just \"EV\". If the transportation mode genuinely cannot be determined from the text, return \"unknown\".\n  * modality_types_evidence: JSON array of 1–3 exact verbatim text quotes (each ≤ 200 chars) identifying the vehicle/fleet type(s) studied (e.g. case study description, fleet composition, sample vehicle specs)."
+  }
+]

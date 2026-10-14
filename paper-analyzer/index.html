@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV Grid Integration — AI Literature Review Extractor</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+
+<!-- ================================================================
+     SCREEN 1: SETUP & EXTRACTION DASHBOARD
+     ================================================================ -->
+<div id="screen-setup">
+
+  <!-- Header -->
+  <header class="bg-gray-900 border-b border-gray-800 px-6 py-3.5 flex items-center justify-between sticky top-0 z-10">
+    <div>
+      <h1 class="text-lg font-bold text-indigo-400 tracking-tight">EV Grid Integration — Literature Review Extractor</h1>
+      <p class="text-xs text-gray-500 mt-0.5">Automated AI extraction + human-in-the-loop verification for systematic reviews</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="loadSession()" title="Load saved session JSON"
+              class="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 transition-colors flex items-center gap-1.5">
+        📂 Load Session
+      </button>
+      <div class="text-xs text-amber-500 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
+        ⚠ Never host publicly — API key stored locally only
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-2xl mx-auto px-5 py-7 space-y-5">
+
+    <!-- API Key + Model -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          Google AI Studio API Key
+          <span class="ml-2 normal-case text-gray-600 font-normal">(persisted in localStorage)</span>
+        </label>
+        <div class="flex gap-2">
+          <input type="password" id="api-key-input" autocomplete="off" spellcheck="false"
+                 class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                 placeholder="AIza… or AQ.…" />
+          <button onclick="saveApiKey()"
+                  class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors whitespace-nowrap">
+            Save Key
+          </button>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          Gemini Model
+          <span class="ml-2 normal-case text-gray-600 font-normal">if one gives 429, try another</span>
+        </label>
+        <select id="model-select"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onchange="saveModel()">
+          <option value="gemini-3.1-flash-lite:thinking">gemini-3.1-flash-lite + thinking (recommended)</option>
+          <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+          <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+          <option value="gemini-2.5-flash-lite:thinking">gemini-2.5-flash-lite + thinking</option>
+          <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+          <option value="none">No model — import JSON manually</option>
+        </select>
+      </div>
+      <p class="text-xs text-gray-600">
+        💡 If you get 429 errors: click <strong class="text-gray-400">Set up billing</strong> in
+        <a class="text-indigo-400 underline" href="https://aistudio.google.com/app/apikey" target="_blank">AI Studio</a>
+        (free tier — no charges within limits, but billing account must be linked).
+      </p>
+    </div>
+
+    <!-- Fields Configuration Panel -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3">
+        <button id="fields-panel-toggle" onclick="toggleFieldsPanel()"
+                class="flex items-center gap-2 text-left flex-1 min-w-0">
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide shrink-0">Field Configuration</span>
+          <span id="fields-count-badge" class="text-xs text-gray-600 truncate"></span>
+        </button>
+        <div class="flex items-center gap-1.5 shrink-0 ml-2">
+          <button onclick="openAddFieldModal()"
+                  class="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-gray-200 rounded-full transition-colors">
+            + Add field
+          </button>
+          <button onclick="importFieldsJson()"
+                  class="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-gray-200 rounded-full transition-colors">
+            ↑ Import JSON
+          </button>
+          <button onclick="exportFieldsJson()"
+                  class="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-gray-200 rounded-full transition-colors">
+            ↓ Export JSON
+          </button>
+          <button onclick="exportPromptText()"
+                  class="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-gray-200 rounded-full transition-colors">
+            ↓ Export Prompt
+          </button>
+          <button onclick="resetFieldsFromFile()"
+                  class="text-xs px-2.5 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-gray-200 rounded-full transition-colors">
+            ↺ Reset
+          </button>
+          <span id="fields-chevron" class="text-gray-600 text-xs ml-1">▼</span>
+        </div>
+      </div>
+      <div id="fields-list" class="border-t border-gray-800 divide-y divide-gray-800/60 max-h-72 overflow-y-auto"></div>
+    </div>
+
+    <!-- Scopus CSV Upload -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+      <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wide">
+        Scopus CSV — one-by-one paper review
+        <span class="ml-2 normal-case text-gray-600 font-normal">rows with Exclusion Reason = "IN" are processed</span>
+      </label>
+      <div id="csv-drop-zone"
+           class="drop-zone bg-gray-800/60 border-2 border-dashed border-gray-700 rounded-xl p-6 text-center cursor-pointer hover:border-gray-600 transition-colors"
+           onclick="document.getElementById('csv-file-input').click()"
+           ondragover="handleCsvDragOver(event)"
+           ondragleave="handleCsvDragLeave(event)"
+           ondrop="handleCsvDrop(event)">
+        <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="handleCsvFile(this)" />
+        <div class="text-3xl mb-2 select-none">📊</div>
+        <p class="text-gray-300 font-medium text-sm">Drop Scopus CSV here, or click to browse</p>
+        <div id="csv-status-badge" class="hidden mt-2 text-sm text-emerald-400 font-medium"></div>
+      </div>
+      <!-- PDF batch upload — revealed after CSV is loaded -->
+      <div id="csv-pdf-batch-zone" class="hidden space-y-2">
+        <div class="drop-zone bg-gray-800/40 border-2 border-dashed border-gray-700 rounded-xl px-5 py-4 text-center cursor-pointer hover:border-gray-500 transition-colors"
+             onclick="document.getElementById('csv-pdf-batch-input').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-active')"
+             ondragleave="this.classList.remove('drag-active')"
+             ondrop="event.preventDefault();this.classList.remove('drag-active');handleBatchPdfs(event.dataTransfer.files)">
+          <input type="file" id="csv-pdf-batch-input" accept=".pdf" multiple class="hidden"
+                 onchange="handleBatchPdfs(this.files)" />
+          <p class="text-gray-400 text-sm font-medium">Drop all PDFs here — matched to CSV rows by DOI</p>
+          <p class="text-gray-600 text-xs mt-0.5">Unmatched PDFs are ignored · missing PDFs are asked one by one</p>
+        </div>
+        <div id="csv-match-status" class="hidden text-xs text-indigo-400 text-center py-1"></div>
+        <div id="csv-match-results" class="hidden space-y-1 px-1"></div>
+      </div>
+
+      <div id="csv-start-row" class="hidden flex items-center justify-between gap-3">
+        <span id="csv-summary" class="text-xs text-gray-500 truncate"></span>
+        <button id="btn-start-review" onclick="startCsvWorkflow()"
+                class="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition-colors whitespace-nowrap">
+          Start Review →
+        </button>
+      </div>
+    </div>
+
+    <!-- PDF-only mode — no CSV needed -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+      <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wide">
+        PDF-only — no CSV needed
+        <span class="ml-2 normal-case text-gray-600 font-normal">title &amp; DOI extracted from each PDF · exports a CSV when done</span>
+      </label>
+      <div class="drop-zone bg-gray-800/60 border-2 border-dashed border-gray-700 rounded-xl p-6 text-center cursor-pointer hover:border-gray-600 transition-colors"
+           onclick="document.getElementById('pdf-only-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-active')"
+           ondragleave="this.classList.remove('drag-active')"
+           ondrop="event.preventDefault();this.classList.remove('drag-active');handlePdfsOnly(event.dataTransfer.files)">
+        <input type="file" id="pdf-only-input" accept=".pdf" multiple class="hidden"
+               onchange="handlePdfsOnly(this.files)" />
+        <div class="text-3xl mb-2 select-none">📄</div>
+        <p class="text-gray-300 font-medium text-sm">Drop PDFs here to start without a CSV</p>
+        <p class="text-gray-600 text-xs mt-0.5">Drop more PDFs to add to the queue · duplicates are skipped</p>
+      </div>
+      <div id="pdf-only-status" class="hidden text-xs text-indigo-400 text-center py-1"></div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ================================================================
+     SCREEN 2: VERIFICATION WORKSPACE
+     ================================================================ -->
+<div id="screen-verify">
+
+  <!-- Split Panes -->
+  <div class="flex flex-1 overflow-hidden" style="height:calc(100vh - 56px)">
+
+    <!-- LEFT: PDF Viewer (PDF.js canvas renderer) -->
+    <div class="w-1/2 flex flex-col border-r border-gray-800">
+      <div class="flex items-center gap-1.5 px-3 py-2 bg-gray-900 border-b border-gray-800 shrink-0">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide shrink-0">PDF</span>
+        <span id="pdf-filename" class="text-xs text-indigo-400 truncate min-w-0 flex-1"></span>
+        <input id="pdf-search-input" type="text" placeholder="Search…"
+               class="w-36 shrink-0 bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+               oninput="pdfSearchReset()"
+               onkeydown="if(event.key==='Enter'){event.shiftKey?pdfSearchNav(-1):pdfSearchNav(1)}" />
+        <button onclick="pdfSearchNav(-1)" title="Previous match (Shift+Enter)"
+                class="shrink-0 px-1.5 py-1 bg-gray-700 hover:bg-gray-600 border border-gray-700 rounded text-xs text-gray-300 transition-colors">↑</button>
+        <button onclick="pdfSearchNav(1)" title="Next match (Enter)"
+                class="shrink-0 px-1.5 py-1 bg-gray-700 hover:bg-gray-600 border border-gray-700 rounded text-xs text-gray-300 transition-colors">↓</button>
+        <span id="pdf-search-counter" class="shrink-0 text-xs text-gray-500 tabular-nums min-w-[3rem] text-center"></span>
+        <span id="pdf-page-info" class="shrink-0 text-xs text-gray-600 tabular-nums"></span>
+      </div>
+      <div id="pdf-viewer-wrap" class="flex-1 overflow-y-auto" style="height:0">
+        <div id="pdf-pages">
+          <p class="text-gray-700 text-sm mt-16 text-center">Select a paper and open the verification workspace</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Verification Form -->
+    <div class="w-1/2 flex flex-col">
+      <div class="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 shrink-0">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Extraction Form</span>
+        <button onclick="showSetup()" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+          ← Back to Setup
+        </button>
+      </div>
+      <div id="form-pane" class="form-pane flex-1 px-4 py-4 space-y-4 bg-gray-950"></div>
+    </div>
+  </div>
+
+  <!-- CSV Prefetch Strip N+1 -->
+  <div id="csv-prefetch-strip-1"
+       class="hidden shrink-0 bg-gray-900/70 border-t border-gray-800/60 flex items-center px-4 py-1.5 gap-2">
+    <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide shrink-0">Next +1</span>
+    <span id="prefetch-badge-1" class="text-xs bg-gray-800 text-gray-500 border border-gray-700 rounded-full px-2 py-0.5 font-mono shrink-0"></span>
+    <button onclick="copyPrefetchTitle(1)" title="Copy title to clipboard"
+            class="shrink-0 text-gray-600 hover:text-gray-300 transition-colors text-sm leading-none px-0.5">⎘</button>
+    <span id="prefetch-title-1" class="text-xs text-gray-400 flex-1 min-w-0"></span>
+    <input type="file" id="prefetch-pdf-input-1" accept=".pdf" class="hidden" onchange="handlePrefetchPdf(this.files[0], 1)" />
+    <button id="prefetch-upload-btn-1" onclick="document.getElementById('prefetch-pdf-input-1').click()"
+            class="shrink-0 text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-gray-300 transition-colors whitespace-nowrap">
+      ↑ Upload PDF
+    </button>
+    <span id="prefetch-status-1" class="text-xs whitespace-nowrap shrink-0"></span>
+  </div>
+  <!-- CSV Prefetch Strip N+2 -->
+  <div id="csv-prefetch-strip-2"
+       class="hidden shrink-0 bg-gray-900/60 border-t border-gray-800/40 flex items-center px-4 py-1.5 gap-2">
+    <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide shrink-0">Next +2</span>
+    <span id="prefetch-badge-2" class="text-xs bg-gray-800 text-gray-600 border border-gray-700/60 rounded-full px-2 py-0.5 font-mono shrink-0"></span>
+    <button onclick="copyPrefetchTitle(2)" title="Copy title to clipboard"
+            class="shrink-0 text-gray-700 hover:text-gray-300 transition-colors text-sm leading-none px-0.5">⎘</button>
+    <span id="prefetch-title-2" class="text-xs text-gray-500 flex-1 min-w-0"></span>
+    <input type="file" id="prefetch-pdf-input-2" accept=".pdf" class="hidden" onchange="handlePrefetchPdf(this.files[0], 2)" />
+    <button id="prefetch-upload-btn-2" onclick="document.getElementById('prefetch-pdf-input-2').click()"
+            class="shrink-0 text-xs px-3 py-1 bg-gray-700/70 hover:bg-gray-600 border border-gray-700/60 rounded-lg text-gray-400 transition-colors whitespace-nowrap">
+      ↑ Upload PDF
+    </button>
+    <span id="prefetch-status-2" class="text-xs whitespace-nowrap shrink-0"></span>
+  </div>
+
+  <!-- Bottom Action Dock -->
+  <div class="shrink-0 h-14 bg-gray-900 border-t border-gray-800 flex items-center px-4 gap-3">
+    <button id="btn-prev" onclick="navigate(-1)"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors">
+      ← Previous
+    </button>
+    <button id="btn-next" onclick="navigate(1)"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">
+      Save &amp; Next →
+    </button>
+    <button id="btn-verify" onclick="verifyAndNext()"
+            class="hidden px-4 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm font-medium transition-colors">
+      Verify &amp; Next ✓
+    </button>
+    <button id="btn-skip" onclick="skipCurrentPaper()"
+            class="hidden px-4 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-sm font-medium transition-colors text-gray-400">
+      Skip →
+    </button>
+    <span id="verify-counter" class="text-sm text-gray-400 ml-1 tabular-nums"></span>
+    <div class="flex-1"></div>
+    <button onclick="importPaperJson()"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 text-gray-300">
+      ↑ Import JSON
+    </button>
+    <button onclick="saveSession()"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 text-gray-300">
+      💾 Save Session
+    </button>
+    <button onclick="exportPapersJson()"
+            class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+      ↓ Export JSON
+    </button>
+    <button onclick="exportCSV()"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+      📊 Export CSV
+    </button>
+    <button id="btn-export-scopus" onclick="exportScopusCsv()"
+            class="hidden px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+      📊 Export Scopus CSV
+    </button>
+  </div>
+
+</div>
+
+
+<!-- Field Editor Modal -->
+<div id="field-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+  <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 id="field-modal-title" class="text-base font-semibold text-gray-200">Add Field</h2>
+      <button onclick="closeFieldModal()" class="text-gray-500 hover:text-gray-300 text-lg leading-none">✕</button>
+    </div>
+
+    <!-- Key + Label -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Key <span class="text-red-400">*</span></label>
+        <input id="fm-key" type="text" placeholder="snake_case_key"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Label</label>
+        <input id="fm-label" type="text" placeholder="Human readable label"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+    </div>
+
+    <!-- Type -->
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">Type</label>
+      <select id="fm-type" onchange="updateFieldModalForType()"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        <option value="enum">enum</option>
+        <option value="string">string</option>
+        <option value="boolean">boolean</option>
+        <option value="integer">integer</option>
+        <option value="number">number</option>
+        <option value="evidence_only">evidence_only</option>
+        <option value="boolean_group">boolean_group</option>
+        <option value="methodologies">methodologies</option>
+      </select>
+    </div>
+
+    <!-- Enum options -->
+    <div id="fm-options-wrap">
+      <label class="block text-xs text-gray-500 mb-1">Options (one per line)</label>
+      <textarea id="fm-options" rows="4"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+      <div class="mt-1.5">
+        <label class="block text-xs text-gray-500 mb-1">Default value</label>
+        <input id="fm-default" type="text" placeholder="e.g. unknown"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+    </div>
+
+    <!-- Boolean group sub-fields -->
+    <div id="fm-boolgroup-wrap" style="display:none">
+      <label class="block text-xs text-gray-500 mb-1">Sub-fields (one per line: <code class="text-xs">key: Label</code>)</label>
+      <textarea id="fm-boolgroup" rows="4"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+    </div>
+
+    <!-- Evidence -->
+    <div id="fm-evidence-section">
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input id="fm-evidence" type="checkbox" onchange="updateFieldModalForType()"
+               class="w-4 h-4 accent-amber-500" />
+        <span class="text-sm text-gray-300">Has evidence array</span>
+      </label>
+      <div id="fm-evidence-details" class="mt-2 space-y-2 pl-6" style="display:none">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Evidence key (leave blank for <code class="text-xs">{key}_evidence</code>)</label>
+          <input id="fm-evidence-key" type="text" placeholder="optional override"
+                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Evidence label</label>
+          <input id="fm-evidence-label" type="text" placeholder="e.g. Boundary constraint evidence"
+                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Show when -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Show when key</label>
+        <input id="fm-show-when-key" type="text" placeholder="other_field_key"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Show when value</label>
+        <input id="fm-show-when-value" type="text" placeholder="e.g. yes"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+    </div>
+
+    <!-- Subfield + Hint -->
+    <div class="space-y-2">
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input id="fm-subfield" type="checkbox" class="w-4 h-4 accent-sky-500" />
+        <span class="text-sm text-gray-300">Sub-field style (sky indent)</span>
+      </label>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Hint</label>
+        <input id="fm-hint" type="text" placeholder="Short hint shown next to label"
+               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+      </div>
+    </div>
+
+    <!-- Prompt text -->
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">Prompt text (injected into {FIELD_DEFINITIONS})</label>
+      <textarea id="fm-prompt-text" rows="6"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Describe this field for the AI…"></textarea>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-end gap-2 pt-1 border-t border-gray-800">
+      <button onclick="closeFieldModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors text-gray-300">Cancel</button>
+      <button onclick="saveFieldModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors">Save Field</button>
+    </div>
+  </div>
+</div>
+
+<!-- Script loading order: dependencies first -->
+<script src="app.js"></script>
+<script src="fields.js"></script>
+<script src="prompt.js"></script>
+<script src="pdf.js"></script>
+<script src="form.js"></script>
+<script src="api.js"></script>
+<script src="files.js"></script>
+<script src="session.js"></script>
+<script src="export.js"></script>
+<script src="csv.js"></script>
+<script src="ask.js"></script>
+<script src="nav.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
