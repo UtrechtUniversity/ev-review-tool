@@ -25,6 +25,13 @@ The extraction assistant (`paper-analyzer`), with the extraction form and its ev
 
 Both tools are static HTML/JavaScript; there is no build step and no backend.
 
+**Online:** both tools are hosted on GitHub Pages:
+
+- Screening: <https://utrechtuniversity.github.io/ev-review-tool/abstract-scanning.html>
+- Extraction: <https://utrechtuniversity.github.io/ev-review-tool/paper-analyzer/>
+
+To run them locally instead:
+
 **Screening:** open `abstract-scanning.html` in a browser.
 
 **Extraction:** serve the `paper-analyzer` folder over HTTP so it can load `fields.json` and `prompt.txt`:
