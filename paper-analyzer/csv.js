@@ -97,11 +97,15 @@ function loadCsvData(text, filename) {
   const { headers, rows } = parseCsvRaw(text);
   if (!headers.length) return alert('Could not parse CSV — is it a valid Scopus export?');
 
+  // Screened CSV (from abstract-scanning.html): keep only rows marked IN.
+  // Plain Scopus export without that column: keep every row.
   const excKey = headers.find(h => h.toLowerCase().replace(/\s+/g, ' ').trim() === 'exclusion reason');
-  if (!excKey) return alert('No "Exclusion Reason" column found in CSV.');
-
-  const included = rows.filter(r => (r[excKey] || '').trim().toUpperCase() === 'IN');
-  if (!included.length) return alert('No rows with Exclusion Reason = "IN" found.');
+  const included = excKey
+    ? rows.filter(r => (r[excKey] || '').trim().toUpperCase() === 'IN')
+    : rows;
+  if (!included.length) {
+    return alert(excKey ? 'No rows with Exclusion Reason = "IN" found.' : 'No rows found in CSV.');
+  }
 
   // Match existing verified papers by title so they survive a re-upload / session-then-CSV flow.
   const existingByTitle = new Map();
@@ -168,7 +172,9 @@ function loadCsvData(text, filename) {
   document.getElementById('csv-status-badge').textContent =
     alreadyDone > 0
       ? `${included.length} selected — ${alreadyDone} already verified, ${remaining} remaining`
-      : `${included.length} of ${rows.length} papers selected (Exclusion Reason = IN)`;
+      : excKey
+        ? `${included.length} of ${rows.length} papers selected (Exclusion Reason = IN)`
+        : `${included.length} papers loaded (no Exclusion Reason column — all rows included)`;
   document.getElementById('csv-start-row').classList.remove('hidden');
   document.getElementById('csv-summary').textContent =
     `${remaining} paper${remaining !== 1 ? 's' : ''} to review · ${filename}`;

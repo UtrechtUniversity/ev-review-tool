@@ -12,7 +12,7 @@ const S = {
   csvMode:     false,
   pdfOnlyMode: false, // true when session was started from PDFs without a CSV
   csvHeaders:  [],    // original column names from Scopus CSV
-  csvRows:     [],    // filtered rows (Exclusion Reason == "IN")
+  csvRows:     [],    // rows with Exclusion Reason == "IN", or all rows if that column is absent
   csvFilename:  '',   // original CSV filename (for export)
   csvJobs:     {},    // { idx: { status: 'pending'|'done'|'error', message?: string } }
 };
