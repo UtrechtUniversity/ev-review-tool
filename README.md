@@ -49,6 +49,10 @@ You need your own Gemini API key from [Google AI Studio](https://aistudio.google
 
 If you use or refer to this tool, please cite it using the metadata in [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository" button) and the associated review paper.
 
+## AI assistance
+
+The code in this repository was written with the assistance of Claude Code (Anthropic). All code was reviewed and tested by the author.
+
 ## License
 
 [MIT](LICENSE)
