@@ -6,7 +6,7 @@ authors:
   - family-names: Knops
     given-names: Pieter
     affiliation: Utrecht University
-    # orcid: "https://orcid.org/0000-0000-0000-0000"
+    orcid: "https://orcid.org/0009-0009-7291-717X"
 repository-code: "https://github.com/UtrechtUniversity/ev-review-tool"
 license: MIT
 version: 1.0.0
