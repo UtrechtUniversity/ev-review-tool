@@ -4,7 +4,7 @@ title: "EV Review Tool: screening and AI-assisted data extraction for a systemat
 type: software
 authors:
   - family-names: Knops
-    given-names: Pieter
+    given-names: Pieter Daniël
     affiliation: Utrecht University
     orcid: "https://orcid.org/0009-0009-7291-717X"
 repository-code: "https://github.com/UtrechtUniversity/ev-review-tool"
