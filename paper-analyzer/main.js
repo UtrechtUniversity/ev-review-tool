@@ -2,7 +2,9 @@
 // BOOT
 // ================================================================
 (async () => {
-  const savedKey = localStorage.getItem('ev_review_api_key') || '';
+  // The key is kept only for this tab (sessionStorage); remove keys saved by older versions
+  localStorage.removeItem('ev_review_api_key');
+  const savedKey = sessionStorage.getItem('ev_review_api_key') || '';
   document.getElementById('api-key-input').value = savedKey;
   S.apiKey = savedKey;
 

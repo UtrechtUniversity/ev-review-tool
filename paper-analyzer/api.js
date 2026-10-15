@@ -5,8 +5,8 @@ function saveApiKey() {
   const k = document.getElementById('api-key-input').value.trim();
   if (!k) return;
   S.apiKey = k;
-  localStorage.setItem('ev_review_api_key', k);
-  toast('API key saved', 'emerald');
+  sessionStorage.setItem('ev_review_api_key', k);
+  toast('API key saved for this tab', 'emerald');
 }
 
 function saveModel() {

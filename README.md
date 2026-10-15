@@ -9,7 +9,7 @@ The repository is the companion to the review paper (citation will be added on p
 | Path | Purpose |
 | --- | --- |
 | [`abstract-scanning.html`](abstract-scanning.html) | Title/abstract screening console. Load a Scopus CSV export, step through the records and record an `Exclusion Reason` and `Note` per paper, then export the CSV again. Works fully offline apart from CDN libraries; no AI involved. |
-| [`paper-analyzer/`](paper-analyzer/) | Full-text data-extraction assistant. Load PDFs (and optionally the screening CSV), send the extracted text to a Google Gemini model with a structured prompt, and review/correct every extracted field together with its verbatim evidence quotes before exporting. |
+| [`paper-analyzer/`](paper-analyzer/) | Full-text data-extraction assistant. Load PDFs (and optionally the screening CSV), send the extracted text to a Google Gemini model with a structured prompt (bring your own Gemini API key; see [Running](#running)), and review/correct every extracted field together with its verbatim evidence quotes before exporting. |
 | [`paper-analyzer/fields.json`](paper-analyzer/fields.json) | The extraction schema used in the review: each field, its allowed values and the instructions given to the model. |
 | [`paper-analyzer/prompt.txt`](paper-analyzer/prompt.txt) | The prompt template the field definitions are inserted into. |
 
@@ -44,7 +44,7 @@ python3 -m http.server 8000
 
 (Opening `index.html` directly from disk also works, but then the built-in default fields are used instead of `fields.json`.)
 
-You need your own Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey). Enter it in the app; it is stored only in your browser's `localStorage` and is sent only to the Gemini API. The model can be chosen in the UI. Choosing "No model" lets you import JSON results manually.
+You need your own Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey). Enter it in the app; it is kept only for the current browser tab (`sessionStorage`) and is sent only to the Gemini API. The model can be chosen in the UI. Choosing "No model" lets you import JSON results manually.
 
 ## Data and privacy
 
